@@ -2509,7 +2509,65 @@
     }
    },
    "features": null
-  }
+  },
+  {
+    "name": "Apex",
+    "enabled": false,
+    "verbose": false,
+    "httpTimeout": 0,
+    "websocketResponseCheckTimeout": 0,
+    "websocketResponseMaxLimit": 0,
+    "websocketTrafficTimeout": 0,
+    "baseCurrencies": "",
+    "currencyPairs": {
+     "bypassConfigFormatUpgrades": false,
+     "requestFormat": {
+      "uppercase": true
+     },
+     "configFormat": {
+      "uppercase": true,
+      "delimiter": "-"
+     },
+     "useGlobalFormat": true,
+     "pairs": {
+        "perpetualswap": {
+            "assetEnabled": true,
+            "enabled": "BTCUSDC",
+            "available": "BTCUSDC,ETHUSDC,XRPUSDC"
+        }
+     }
+    },
+    "api": {
+     "authenticatedSupport": false,
+     "authenticatedWebsocketApiSupport": false,
+     "credentials": {
+      "key": "Key",
+      "secret": "Secret"
+     },
+     "urlEndpoints": null
+    },
+    "features": {
+     "supports": {
+      "restAPI": false,
+      "restCapabilities": {},
+      "websocketAPI": false,
+      "websocketCapabilities": {}
+     },
+     "enabled": {
+      "autoPairUpdates": false,
+      "websocketAPI": false,
+      "saveTradeData": false,
+      "tradeFeed": false,
+      "fillsFeed": false
+     }
+    },
+    "orderbook": {
+     "verificationBypass": false,
+     "websocketBufferLimit": 0,
+     "websocketBufferEnabled": false,
+     "publishPeriod": null
+    }
+   }
  ],
  "bankAccounts": [
   {
