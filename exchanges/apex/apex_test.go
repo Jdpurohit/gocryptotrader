@@ -1,9 +1,11 @@
 package apex
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/config"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
@@ -57,3 +59,48 @@ func areTestAPIKeysSet() bool {
 }
 
 // Implement tests for API endpoints below
+
+func TestGetSystemTime(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetSystemTime(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetAllConfigData(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetAllConfig(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetMarketDepthData(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetMarketDepth(context.Background(), "BTCUSDC", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetLatestTrades(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetLatestTrades(context.Background(), "BTCUSDC", 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetCandlestickChart(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetCandlestickChart(context.Background(), "", "", time.Time{}, time.Time{}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ap.GetCandlestickChart(context.Background(), "5", "BTCUSDC", time.Now().Add(-time.Hour*12), time.Now(), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
