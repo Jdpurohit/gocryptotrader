@@ -13,9 +13,9 @@ var validIntervals = []string{
 	"D", "M", "W",
 }
 
-//1 3 5 15 30 + 60 120 240 360 720 + D + W + M
 var (
 	errInvalidInterval = errors.New("invalid interval")
+	errSymbolMissing   = errors.New("symbol missing")
 )
 
 // UnmarshalTo acts as interface to exchange API response
@@ -185,13 +185,13 @@ type TradeData struct {
 }
 
 type KlineData struct {
-	Start    apexTimeMilliSec `json:"start"`
-	Symbol   string           `json:"symbol"`
-	Interval string           `json:"interval"`
-	Low      float64          `json:"low,string"`
-	High     float64          `json:"high,string"`
-	Open     float64          `json:"open,string"`
-	Close    float64          `json:"close,string"`
-	Volume   float64          `json:"volume,string"`
-	Turnover float64          `json:"turnover,string"`
+	Start    apexTimeMilliSec `json:"t"`
+	Symbol   string           `json:"s"`
+	Interval string           `json:"i"`
+	Low      float64          `json:"l,string"`
+	High     float64          `json:"h,string"`
+	Open     float64          `json:"o,string"`
+	Close    float64          `json:"c,string"`
+	Volume   float64          `json:"v,string"`
+	Turnover float64          `json:"tr,string"`
 }

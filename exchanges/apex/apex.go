@@ -131,22 +131,25 @@ func (ap *Apex) GetLatestTrades(ctx context.Context, symbol string, limit, from 
 }
 
 // GetCandlestickChart retrieves all candlestick chart data.
+// Note: API response was not as per the v1 documentation so made changes as per the response.
 func (ap *Apex) GetCandlestickChart(ctx context.Context, interval, symbol string, startTime, endTime time.Time, limit int64) ([]KlineData, error) {
 	resp := struct {
-		Data []KlineData `json:"data"`
+		Data map[string][]KlineData `json:"data"`
 		Error
 	}{}
 
 	params := url.Values{}
 	if interval != "" {
 		if !common.StringDataCompare(validIntervals, interval) {
-			return resp.Data, errInvalidInterval
+			return nil, errInvalidInterval
 		}
 		params.Set("interval", interval)
 	}
-	if symbol != "" {
-		params.Set("symbol", symbol)
+	if symbol == "" {
+		return nil, errSymbolMissing
 	}
+	params.Set("symbol", symbol)
+
 	if !startTime.IsZero() {
 		params.Add("start", strconv.FormatInt(startTime.UnixMilli(), 10))
 	}
@@ -157,7 +160,7 @@ func (ap *Apex) GetCandlestickChart(ctx context.Context, interval, symbol string
 		params.Set("limit", strconv.FormatInt(limit, 10))
 	}
 	path := common.EncodeURLValues(apexKlines, params)
-	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+	return resp.Data[symbol], ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
 }
 
 // SendHTTPRequest sends an unauthenticated request

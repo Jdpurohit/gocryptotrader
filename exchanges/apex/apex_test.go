@@ -94,12 +94,12 @@ func TestGetLatestTrades(t *testing.T) {
 
 func TestGetCandlestickChart(t *testing.T) {
 	t.Parallel()
-	_, err := ap.GetCandlestickChart(context.Background(), "", "", time.Time{}, time.Time{}, 0)
+	_, err := ap.GetCandlestickChart(context.Background(), "D", "BTCUSDC", time.Time{}, time.Time{}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = ap.GetCandlestickChart(context.Background(), "5", "BTCUSDC", time.Now().Add(-time.Hour*12), time.Now(), 0)
+	_, err = ap.GetCandlestickChart(context.Background(), "", "BTCUSDC", time.Now().Add(-time.Hour*24), time.Now(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
