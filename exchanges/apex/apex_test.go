@@ -104,3 +104,27 @@ func TestGetCandlestickChart(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetTicker(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetTicker(context.Background(), "BTCUSDC")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetFundingRateHistory(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetFundingRateHistory(context.Background(), "BTCUSDC", time.Time{}, time.Time{}, 0, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCheckIfUserExists(t *testing.T) {
+	t.Parallel()
+	_, err := ap.CheckIfUserExists(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+}

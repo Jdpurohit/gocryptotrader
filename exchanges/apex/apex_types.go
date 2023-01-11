@@ -195,3 +195,38 @@ type KlineData struct {
 	Volume   float64          `json:"v,string"`
 	Turnover float64          `json:"tr,string"`
 }
+
+type TickerData struct {
+	Symbol               string  `json:"symbol"`
+	Price24hPcnt         float64 `json:"price24hPcnt,string"`
+	LastPrice            float64 `json:"lastPrice,string"`
+	HighPrice24h         float64 `json:"highPrice24h,string"`
+	LowPrice24h          float64 `json:"lowPrice24h,string"`
+	OraclePrice          float64 `json:"oraclePrice,string"`
+	IndexPrice           float64 `json:"indexPrice,string"`
+	OpenInterest         float64 `json:"openInterest,string"`
+	Turnover24h          float64 `json:"turnover24h,string"`
+	Volume24h            float64 `json:"volume24h,string"`
+	FundingRate          float64 `json:"fundingRate,string"`
+	PredictedFundingRate float64 `json:"predictedFundingRate,string"`
+	NextFundingTime      string  `json:"nextFundingTime"`
+	TradeCount           string  `json:"tradeCount"`
+}
+
+type FundData struct {
+	Symbol           string  `json:"symbol"`
+	Rate             float64 `json:"rate"`
+	Price            float64 `json:"price"`
+	FundingTime      int64   `json:"fundingTime"`
+	FundingTimestamp int64   `json:"fundingTimestamp"`
+}
+
+type VersionData struct {
+	PlatformName       string `json:"platformName"`
+	LatestVersion      string `json:"latestVersion"`
+	ForceUpdateVersion string `json:"forceUpdateVersion"`
+	DownloadUrl        string `json:"downloadUrl"`
+	MarketUrl          string `json:"marketUrl"`
+	Description        string `json:"description"`
+	Title              string `json:"title"`
+}

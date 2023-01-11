@@ -30,9 +30,7 @@ const (
 	apexKlines             = "/klines"
 	apexTicker             = "/ticker"
 	apexFundingRateHistory = "/history-funding"
-	apexCheckVersion       = "/check-version"
 	apexCheckUserExists    = "/check-user-exist"
-	apexAdvertisementData  = "/ads-banner"
 
 	// Authenticated endpoints
 )
@@ -161,6 +159,67 @@ func (ap *Apex) GetCandlestickChart(ctx context.Context, interval, symbol string
 	}
 	path := common.EncodeURLValues(apexKlines, params)
 	return resp.Data[symbol], ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+}
+
+// GetTicker retrieves the latest data on symbol tickers.
+func (ap *Apex) GetTicker(ctx context.Context, symbol string) ([]TickerData, error) {
+	resp := struct {
+		Data []TickerData `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if symbol == "" {
+		return nil, errSymbolMissing
+	}
+	params.Set("symbol", symbol)
+	path := common.EncodeURLValues(apexTicker, params)
+	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+}
+
+// GetFundingRateHistory retrieves the funding rate history.
+func (ap *Apex) GetFundingRateHistory(ctx context.Context, symbol string, startTime, endTime time.Time, limit, page int64) ([]FundData, error) {
+	resp := struct {
+		Data struct {
+			FundingHistory []FundData `json:"historyFunds"`
+		} `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if symbol == "" {
+		return nil, errSymbolMissing
+	}
+	params.Set("symbol", symbol)
+	if !startTime.IsZero() {
+		params.Add("beginTimeInclusive", strconv.FormatInt(startTime.UnixMilli(), 10))
+	}
+	if !endTime.IsZero() {
+		params.Add("endTimeExclusive", strconv.FormatInt(endTime.UnixMilli(), 10))
+	}
+	if limit != 0 {
+		params.Set("limit", strconv.FormatInt(limit, 10))
+	}
+	if page >= 0 {
+		params.Set("page", strconv.FormatInt(page, 10))
+	}
+	path := common.EncodeURLValues(apexFundingRateHistory, params)
+	return resp.Data.FundingHistory, ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+}
+
+// CheckIfUserExists validates if user exists in the system.
+func (ap *Apex) CheckIfUserExists(ctx context.Context, ethAddress string) (bool, error) {
+	resp := struct {
+		Data bool `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if ethAddress != "" {
+		params.Set("ethAddress", ethAddress)
+	}
+
+	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, apexCheckUserExists, publicSpotRate, &resp)
 }
 
 // SendHTTPRequest sends an unauthenticated request
