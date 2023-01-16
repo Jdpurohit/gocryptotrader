@@ -2512,7 +2512,7 @@
   },
   {
     "name": "Apex",
-    "enabled": false,
+    "enabled": true,
     "verbose": false,
     "httpTimeout": 0,
     "websocketResponseCheckTimeout": 0,

@@ -14,8 +14,11 @@ var validIntervals = []string{
 }
 
 var (
-	errInvalidInterval = errors.New("invalid interval")
-	errSymbolMissing   = errors.New("symbol missing")
+	errInvalidInterval   = errors.New("invalid interval")
+	errSymbolMissing     = errors.New("symbol missing")
+	errETHAddressMissing = errors.New("ethAddress missing")
+	errStarkKeyMissing   = errors.New("starkKey missing")
+	errChainIDMissing    = errors.New("chainId missing")
 )
 
 // UnmarshalTo acts as interface to exchange API response
@@ -229,4 +232,9 @@ type VersionData struct {
 	MarketUrl          string `json:"marketUrl"`
 	Description        string `json:"description"`
 	Title              string `json:"title"`
+}
+
+type NonceData struct {
+	Nonce       string           `json:"nonce"`
+	NonceExpiry apexTimeMilliSec `json:"nonceExpired"`
 }

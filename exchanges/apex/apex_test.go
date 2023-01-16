@@ -128,3 +128,14 @@ func TestCheckIfUserExists(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGenerateNonce(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.GenerateNonce(context.Background(), "0x4315c720e1c256A800B93c1742a6525fF40aB7C5", "0x7c9fec5834aaa1e30143544ee0d8ed91025d1336bb188d57592d5e64e5b7c5f", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+}

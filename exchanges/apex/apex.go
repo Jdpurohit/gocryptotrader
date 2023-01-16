@@ -1,6 +1,7 @@
 package apex
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/url"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common"
+	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
@@ -33,6 +35,7 @@ const (
 	apexCheckUserExists    = "/check-user-exist"
 
 	// Authenticated endpoints
+	apexNonce = "/generate-nonce"
 )
 
 // GetSystemTime gets system time
@@ -222,6 +225,29 @@ func (ap *Apex) CheckIfUserExists(ctx context.Context, ethAddress string) (bool,
 	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, apexCheckUserExists, publicSpotRate, &resp)
 }
 
+// GenerateNonce generate and obtain nonce.
+func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID string) (*NonceData, error) {
+	resp := struct {
+		Data NonceData `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if ethAddress == "" {
+		return nil, errETHAddressMissing
+	}
+	params.Set("ethAddress", ethAddress)
+	if starkKey == "" {
+		return nil, errStarkKeyMissing
+	}
+	params.Set("starkKey", starkKey)
+	if chainID == "" {
+		return nil, errChainIDMissing
+	}
+	params.Set("chainId", chainID)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexNonce, params, &resp, publicSpotRate)
+}
+
 // SendHTTPRequest sends an unauthenticated request
 func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path string, f request.EndpointLimit, result UnmarshalTo) error {
 	endpointPath, err := ap.API.Endpoints.GetURL(ePath)
@@ -242,4 +268,70 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path st
 		return err
 	}
 	return result.GetError()
+}
+
+// SendAuthHTTPRequest sends an authenticated HTTP request
+func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, result UnmarshalTo, f request.EndpointLimit) error {
+	// creds, err := ap.GetCredentials(ctx)
+	// if err != nil {
+	// 	return err
+	// }
+
+	if result == nil {
+		result = &Error{}
+	}
+	endpointPath, err := ap.API.Endpoints.GetURL(ePath)
+	if err != nil {
+		return err
+	}
+	if params == nil {
+		params = url.Values{}
+	}
+
+	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
+		var (
+			payload []byte
+			//hmacSignedStr string
+		)
+		headers := make(map[string]string)
+
+		// timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
+		// message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
+		// hmacSignedStr, err = getSign(message, creds.Secret)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// headers["APEX-SIGNATURE"] = hmacSignedStr
+		// headers["APEX-TIMESTAMP"] = timeStr
+		// headers["APEX-API-KEY"] = creds.Key
+		// headers["APEX-PASSPHRASE"] = "UzmQ0kfonxwb_ZK6I4ue" // passphrase variable to be added
+
+		switch method {
+		case http.MethodPost:
+			headers["Content-Type"] = "application/x-www-form-urlencoded"
+		}
+		payload = []byte(params.Encode())
+		return &request.Item{
+			Method:        method,
+			Path:          endpointPath + apexAPIVersion + path,
+			Headers:       headers,
+			Body:          bytes.NewBuffer(payload),
+			Result:        &result,
+			AuthRequest:   true,
+			Verbose:       ap.Verbose,
+			HTTPDebugging: ap.HTTPDebugging,
+			HTTPRecording: ap.HTTPRecording}, nil
+	})
+	if err != nil {
+		return err
+	}
+	return result.GetError()
+}
+
+func getSign(msg, secret string) (string, error) {
+	hmacSigned, err := crypto.GetHMAC(crypto.HashSHA256, []byte(msg), []byte(secret))
+	if err != nil {
+		return "", err
+	}
+	return crypto.HexEncodeToString(hmacSigned), nil
 }
