@@ -3,19 +3,21 @@ package apex
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common"
-	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	solsha3 "github.com/miguelmota/go-solidity-sha3"
 )
 
@@ -364,12 +366,12 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 	return result.GetError()
 }
 
-func getSign(msg, secret string) (string, error) {
-	hmacSigned, err := crypto.GetHMAC(crypto.HashSHA256, []byte(msg), []byte(secret))
+func getSign(action, nonce string) (string, error) {
+	sign, err := signMethod(getHash(action, nonce))
 	if err != nil {
 		return "", err
 	}
-	return crypto.HexEncodeToString(hmacSigned), nil
+	return sign, nil
 }
 
 func getEIP712Message(action, nonce string) string {
@@ -421,12 +423,54 @@ func getEIP712Message(action, nonce string) string {
 	}`, action, nonce)
 }
 
-func getHash(action, nonce string) string {
-	hash := solsha3.SoliditySHA3(
+func getHash(action, nonce string) []byte {
+	return solsha3.SoliditySHA3(
 		solsha3.Bytes32("ApeX(string action,string onlySignOn,string nonce)"),
 		solsha3.Bytes32(action),
 		solsha3.Bytes32("https://pro.apex.exchange"),
 		solsha3.Bytes32(nonce),
 	)
-	return hex.EncodeToString(hash)
+	//hex.EncodeToString()
+}
+
+func signMethod(payload []byte) (string, error) {
+	privateKey, err := crypto.HexToECDSA("fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19")
+	if err != nil {
+		return "", err
+	}
+
+	signature, err := crypto.Sign(payload, privateKey)
+	if err != nil {
+		return "", err
+	}
+
+	tSign, err := createTypedSign(hexutil.Encode(signature))
+	if err != nil {
+		return "", err
+	}
+	return tSign, nil
+}
+
+func createTypedSign(sign string) (string, error) {
+	if strings.HasPrefix(sign, "0x") {
+		sign = sign[2:]
+	}
+
+	if len(sign) != 130 {
+		return "", errors.New("invalid raw signature")
+	}
+
+	rs := sign[:128]
+	v := sign[128:130]
+
+	if v == "00" {
+		return "0x" + rs + "1b" + "00", nil
+	}
+	if v == "01" {
+		return "0x" + rs + "1c" + "00", nil
+	}
+	if v == "1b" || v == "1c" {
+		return "0x" + sign + "00", nil
+	}
+	return "", fmt.Errorf("invalid value of v: %s", v)
 }
