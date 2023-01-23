@@ -139,3 +139,14 @@ func TestGenerateNonce(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRegistration(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.Registration(context.Background(), "0x7c9fec5834aaa1e30143544ee0d8ed91025d1336bb188d57592d5e64e5b7c5f", "0x2d99d8e5060171bac631b7efd7d97464fc98b0efcee87aef3a9eca1f965b569", "0x4315c720e1c256A800B93c1742a6525fF40aB7C5", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+}

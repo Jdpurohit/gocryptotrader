@@ -3,6 +3,8 @@ package apex
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,6 +15,8 @@ import (
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
+
+	solsha3 "github.com/miguelmota/go-solidity-sha3"
 )
 
 // Apex is the overarching type across this package
@@ -35,7 +39,8 @@ const (
 	apexCheckUserExists    = "/check-user-exist"
 
 	// Authenticated endpoints
-	apexNonce = "/generate-nonce"
+	apexNonce        = "/generate-nonce"
+	apexRegistration = "/onboarding"
 )
 
 // GetSystemTime gets system time
@@ -248,6 +253,35 @@ func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID
 	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexNonce, params, &resp, publicSpotRate)
 }
 
+// Registration
+func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate, ethAddress, referredByAffiliateLink, country string) (*NonceData, error) {
+	resp := struct {
+		Data NonceData `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if starkKey == "" {
+		return nil, errStarkKeyMissing
+	}
+	params.Set("starkKey", starkKey)
+	if starkKeyYCoordinate == "" {
+		return nil, errStarkKeyYCoordinateMisssing
+	}
+	params.Set("starkKeyYCoordinate", starkKeyYCoordinate)
+	if ethAddress == "" {
+		return nil, errETHAddressMissing
+	}
+	params.Set("ethereumAddress", ethAddress)
+	if referredByAffiliateLink != "" {
+		params.Set("referredByAffiliateLink", referredByAffiliateLink)
+	}
+	if country != "" {
+		params.Set("country", country)
+	}
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, &resp, publicSpotRate)
+}
+
 // SendHTTPRequest sends an unauthenticated request
 func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path string, f request.EndpointLimit, result UnmarshalTo) error {
 	endpointPath, err := ap.API.Endpoints.GetURL(ePath)
@@ -272,10 +306,10 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path st
 
 // SendAuthHTTPRequest sends an authenticated HTTP request
 func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, result UnmarshalTo, f request.EndpointLimit) error {
-	// creds, err := ap.GetCredentials(ctx)
-	// if err != nil {
-	// 	return err
-	// }
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return err
+	}
 
 	if result == nil {
 		result = &Error{}
@@ -290,25 +324,27 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		var (
-			payload []byte
-			//hmacSignedStr string
+			payload       []byte
+			hmacSignedStr string
 		)
 		headers := make(map[string]string)
 
-		// timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
-		// message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
-		// hmacSignedStr, err = getSign(message, creds.Secret)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// headers["APEX-SIGNATURE"] = hmacSignedStr
-		// headers["APEX-TIMESTAMP"] = timeStr
-		// headers["APEX-API-KEY"] = creds.Key
-		// headers["APEX-PASSPHRASE"] = "UzmQ0kfonxwb_ZK6I4ue" // passphrase variable to be added
+		timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
+		message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
+		hmacSignedStr, err = getSign(message, creds.Secret)
+		if err != nil {
+			return nil, err
+		}
+		headers["APEX-SIGNATURE"] = hmacSignedStr
+		//	headers["APEX-TIMESTAMP"] = timeStr
+		//headers["APEX-API-KEY"] = creds.Key
+		//headers["APEX-PASSPHRASE"] = "UzmQ0kfonxwb_ZK6I4ue" // passphrase variable to be added
+
+		headers["APEX-ETHEREUM-ADDRESS"] = params.Get("ethereumAddress")
 
 		switch method {
 		case http.MethodPost:
-			headers["Content-Type"] = "application/x-www-form-urlencoded"
+			//	headers["Content-Type"] = "application/x-www-form-urlencoded"
 		}
 		payload = []byte(params.Encode())
 		return &request.Item{
@@ -334,4 +370,63 @@ func getSign(msg, secret string) (string, error) {
 		return "", err
 	}
 	return crypto.HexEncodeToString(hmacSigned), nil
+}
+
+func getEIP712Message(action, nonce string) string {
+	return fmt.Sprintf(`{
+		'types': {
+			'EIP712Domain': [
+				{
+					'name': 'name',
+					'type': 'string',
+				},
+				{
+					'name': 'version',
+					'type': 'string',
+				},
+				{
+					'name': 'chainId',
+					'type': 'uint256',
+				},
+			],
+			'ApeX': [
+				{
+					'type': 'string', 
+					'name': 'method'},
+				{	
+					'type': 'string', 
+					'name': 'requestPath'
+				},
+				{
+					'type': 'string', 
+					'name': 'body'
+				},
+				{
+					'type': 'string', 
+					'name': 'timestamp'
+				},
+			],
+		},
+		'domain': {
+			'name': 'ApeX',
+			'version': '1.0',
+			'chainId': 1,
+		},
+		'primaryType': 'ApeX',
+		'message': {
+			'action': '%s',
+			'nonce': '%s',
+			'onlySignOn': 'https://pro.apex.exchange'
+		}
+	}`, action, nonce)
+}
+
+func getHash(action, nonce string) string {
+	hash := solsha3.SoliditySHA3(
+		solsha3.Bytes32("ApeX(string action,string onlySignOn,string nonce)"),
+		solsha3.Bytes32(action),
+		solsha3.Bytes32("https://pro.apex.exchange"),
+		solsha3.Bytes32(nonce),
+	)
+	return hex.EncodeToString(hash)
 }
