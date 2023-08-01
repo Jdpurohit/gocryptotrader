@@ -256,9 +256,9 @@ func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID
 }
 
 // Registration
-func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate, ethAddress, referredByAffiliateLink, country string) (*NonceData, error) {
+func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate, ethAddress, referredByAffiliateLink, country string) (interface{}, error) {
 	resp := struct {
-		Data NonceData `json:"data"`
+		Data interface{} `json:"data"`
 		Error
 	}{}
 
@@ -281,6 +281,8 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 	if country != "" {
 		params.Set("country", country)
 	}
+	params.Set("action", "ApeX Onboarding")
+	params.Set("nonce", "1342153742405074944")
 	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, &resp, publicSpotRate)
 }
 
@@ -308,10 +310,10 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path st
 
 // SendAuthHTTPRequest sends an authenticated HTTP request
 func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, result UnmarshalTo, f request.EndpointLimit) error {
-	creds, err := ap.GetCredentials(ctx)
-	if err != nil {
-		return err
-	}
+	// creds, err := ap.GetCredentials(ctx)
+	// if err != nil {
+	// 	return err
+	// }
 
 	if result == nil {
 		result = &Error{}
@@ -331,9 +333,9 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 		)
 		headers := make(map[string]string)
 
-		timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
-		message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
-		hmacSignedStr, err = getSign(message, creds.Secret)
+		//	timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
+		//	message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
+		hmacSignedStr, err = getSign(params.Get("action"), params.Get("nonce"))
 		if err != nil {
 			return nil, err
 		}
