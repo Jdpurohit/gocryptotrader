@@ -379,13 +379,13 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 	return result.GetError()
 }
 
-// func getSign(nonce string) (string, error) {
-// 	sign, err := signMethod(getHash(nonce))
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return sign, nil
-// }
+func getSign(nonce string) (string, error) {
+	sign, err := signMethod(getHash(nonce))
+	if err != nil {
+		return "", err
+	}
+	return sign, nil
+}
 
 func getEIP712Message(nonce string) string {
 	return fmt.Sprintf(`{
@@ -476,7 +476,7 @@ func getHashString(str string) []byte {
 }
 
 func signMethod(payload []byte) (string, error) {
-	privateKey, err := crypto.HexToECDSA("fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19")
+	privateKey, err := crypto.HexToECDSA("4107c052723f1a92e6a6f6fd81d6b20d75578637584a4c72808f1d44be6c473e")
 	if err != nil {
 		return "", err
 	}
