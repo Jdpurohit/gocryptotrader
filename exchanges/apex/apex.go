@@ -252,7 +252,7 @@ func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID
 		return nil, errChainIDMissing
 	}
 	params.Set("chainId", chainID)
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexNonce, params, &resp, publicSpotRate)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexNonce, params, nil, &resp, publicSpotRate)
 }
 
 // Registration
@@ -283,7 +283,7 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 	}
 	params.Set("action", "ApeX Onboarding")
 	params.Set("nonce", "1342153742405074944")
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, &resp, publicSpotRate)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, nil, &resp, publicSpotRate)
 }
 
 // SendHTTPRequest sends an unauthenticated request
@@ -309,7 +309,8 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path st
 }
 
 // SendAuthHTTPRequest sends an authenticated HTTP request
-func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, result UnmarshalTo, f request.EndpointLimit) error {
+// TODO: remove jsonPayload if non of the request requires it
+func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, jsonPayload map[string]interface{}, result UnmarshalTo, f request.EndpointLimit) error {
 	// creds, err := ap.GetCredentials(ctx)
 	// if err != nil {
 	// 	return err
@@ -326,31 +327,41 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 		params = url.Values{}
 	}
 
+	// eipMsg := getEIP712Message(params.Get("nonce"))
+	// msgHash := getHash(params.Get("nonce"))
+	//sign := getSign()
+
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		var (
-			payload       []byte
-			hmacSignedStr string
+			payload []byte
+			//		hmacSignedStr string
 		)
 		headers := make(map[string]string)
 
 		//	timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 		//	message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
-		hmacSignedStr, err = getSign(params.Get("action"), params.Get("nonce"))
-		if err != nil {
-			return nil, err
-		}
-		headers["APEX-SIGNATURE"] = hmacSignedStr
+		// hmacSignedStr, err = getSign(params.Get("action"), params.Get("nonce"))
+		// if err != nil {
+		// 	return nil, err
+		// }
+		//headers["APEX-SIGNATURE"] = hmacSignedStr
 		//	headers["APEX-TIMESTAMP"] = timeStr
 		//headers["APEX-API-KEY"] = creds.Key
 		//headers["APEX-PASSPHRASE"] = "UzmQ0kfonxwb_ZK6I4ue" // passphrase variable to be added
 
-		headers["APEX-ETHEREUM-ADDRESS"] = params.Get("ethereumAddress")
+		//headers["APEX-ETHEREUM-ADDRESS"] = params.Get("ethereumAddress")
 
 		switch method {
 		case http.MethodPost:
-			//	headers["Content-Type"] = "application/x-www-form-urlencoded"
+			headers["Content-Type"] = "application/x-www-form-urlencoded" // required for getNonce
 		}
 		payload = []byte(params.Encode())
+		// if jsonPayload != nil {
+		// 	payload, err = json.Marshal(jsonPayload)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// }
 		return &request.Item{
 			Method:        method,
 			Path:          endpointPath + apexAPIVersion + path,
@@ -368,71 +379,100 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 	return result.GetError()
 }
 
-func getSign(action, nonce string) (string, error) {
-	sign, err := signMethod(getHash(action, nonce))
-	if err != nil {
-		return "", err
-	}
-	return sign, nil
-}
+// func getSign(nonce string) (string, error) {
+// 	sign, err := signMethod(getHash(nonce))
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	return sign, nil
+// }
 
-func getEIP712Message(action, nonce string) string {
+func getEIP712Message(nonce string) string {
 	return fmt.Sprintf(`{
 		'types': {
 			'EIP712Domain': [
 				{
 					'name': 'name',
-					'type': 'string',
+					'type': 'string'
 				},
 				{
 					'name': 'version',
-					'type': 'string',
+					'type': 'string'
 				},
 				{
 					'name': 'chainId',
-					'type': 'uint256',
-				},
+					'type': 'uint256'
+				}
 			],
 			'ApeX': [
 				{
 					'type': 'string', 
-					'name': 'method'},
+					'name': 'action'
+				},
 				{	
 					'type': 'string', 
-					'name': 'requestPath'
+					'name': 'onlySignOn'
 				},
 				{
 					'type': 'string', 
-					'name': 'body'
-				},
-				{
-					'type': 'string', 
-					'name': 'timestamp'
-				},
-			],
+					'name': 'nonce'
+				}
+			]
 		},
 		'domain': {
 			'name': 'ApeX',
 			'version': '1.0',
-			'chainId': 1,
+			'chainId': 1
 		},
 		'primaryType': 'ApeX',
 		'message': {
-			'action': '%s',
+			'action': 'ApeX Onboarding',
 			'nonce': '%s',
 			'onlySignOn': 'https://pro.apex.exchange'
 		}
-	}`, action, nonce)
+	}`, nonce)
 }
 
-func getHash(action, nonce string) []byte {
+func getHash(nonce string) []byte {
 	return solsha3.SoliditySHA3(
-		solsha3.Bytes32("ApeX(string action,string onlySignOn,string nonce)"),
-		solsha3.Bytes32(action),
-		solsha3.Bytes32("https://pro.apex.exchange"),
-		solsha3.Bytes32(nonce),
+		[]string{"bytes2", "bytes32", "bytes32"},
+		[]interface{}{
+			"0x1901",
+			getDomainHash(),
+			getStructHash(nonce),
+		},
 	)
-	//hex.EncodeToString()
+}
+
+func getDomainHash() []byte {
+	return solsha3.SoliditySHA3(
+		[]string{"bytes32", "bytes32", "bytes32", "uint256"},
+		[]interface{}{
+			getHashString("EIP712Domain(string name,string version,uint256 chainId)"),
+			getHashString("ApeX"),
+			getHashString("1.0"),
+			"1",
+		},
+	)
+}
+
+func getStructHash(nonce string) []byte {
+	return solsha3.SoliditySHA3(
+		[]string{"bytes32", "bytes32", "bytes32", "bytes32"},
+		[]interface{}{
+			getHashString("ApeX(string action,string onlySignOn,string nonce)"),
+			getHashString("ApeX Onboarding"),
+			getHashString("https://pro.apex.exchange"),
+			getHashString(nonce),
+		},
+	)
+}
+
+func getHashString(str string) []byte {
+	return solsha3.SoliditySHA3(
+		[]string{"string"},
+		[]interface{}{str},
+	)
 }
 
 func signMethod(payload []byte) (string, error) {
