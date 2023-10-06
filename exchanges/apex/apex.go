@@ -3,8 +3,10 @@ package apex
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -281,8 +283,7 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 	if country != "" {
 		params.Set("country", country)
 	}
-	params.Set("action", "ApeX Onboarding")
-	params.Set("nonce", "1342153742405074944")
+	params.Set("category", "CATEGORY_API")
 	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, nil, &resp, publicSpotRate)
 }
 
@@ -379,8 +380,110 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 	return result.GetError()
 }
 
+func deriveStarkKey() (string, string, error) {
+	msgStr := "name: ApeX\nversion: 1.0\nenvId: 1\naction: L2 Key\nonlySignOn: https://pro.apex.exchange"
+	//SoliditySHA3WithPrefix can use it instead
+	bHash := getHashString(fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(msgStr), msgStr))
+	fmt.Println("Bytes Hash: ", hex.EncodeToString(bHash))
+	sign, err := signMethod(bHash, SignatureTypePersonal)
+	if err != nil {
+		return "", "", err
+	}
+	fmt.Println("Sign: ", sign)
+
+	bHashSign := solsha3.SoliditySHA3(sign)
+	fmt.Println("bHashSign: ", hex.EncodeToString(bHashSign))
+
+	m := new(big.Int)
+	m.SetString(hex.EncodeToString(bHashSign), 16)
+	fmt.Println("bHashSign Int: ", m.String())
+
+	n := new(big.Int).Rsh(m, 5)
+	privKey := n.Text(16)
+
+	fmt.Println("privKey INT: ", n.String())
+	fmt.Println("privKey Hex: ", privKey)
+
+	x, y := privKeyToECPointOnStarkCurve(n)
+	return x, y, nil
+}
+
+func privKeyToECPointOnStarkCurve(privKeyInt *big.Int) (string, string) {
+	a, _ := new(big.Int).SetString("874739451078007766457464989774322083649278607533249481151382481072868806602", 10)
+	b, _ := new(big.Int).SetString("152666792071518830868575557812948353041420400780739481342941381225525861407", 10)
+
+	c, _ := new(big.Int).SetString("1", 10)
+	d, _ := new(big.Int).SetString("3618502788666131213697322783095070105623107215331596699973092056135872020481", 10)
+
+	ecPoint := ecMult(privKeyInt, [2]*big.Int{a, b}, c, d)
+	return ecPoint[0].Text(16), ecPoint[1].Text(16)
+}
+
+/*	def ec_mult(m: int, point: ECPoint, alpha: int, p: int) -> ECPoint:
+if m == 1:
+    return point
+if m % 2 == 0:
+    return ec_mult(m // 2, ec_double(point, alpha, p), alpha, p)
+return ec_add(ec_mult(m - 1, point, alpha, p), point, p)	*/
+// Multiplies by m a point on the elliptic curve with equation y^2 = x^3 + alpha*x + beta mod p.
+// Assumes the point is given in affine form (x, y) and that 0 < m < order(point).
+func ecMult(privKeyInt *big.Int, ecGenPair [2]*big.Int, alpha, fieldPrime *big.Int) [2]*big.Int {
+	if privKeyInt.Cmp(big.NewInt(1)) == 0 {
+		return ecGenPair
+	}
+	if big.NewInt(0).Cmp(new(big.Int).Mod(privKeyInt, big.NewInt(2))) == 0 {
+		return ecMult(new(big.Int).Div(privKeyInt, big.NewInt(2)), ecDouble(ecGenPair, alpha, fieldPrime), alpha, fieldPrime)
+	}
+	return ecAdd(ecMult(new(big.Int).Sub(privKeyInt, big.NewInt(1)), ecGenPair, alpha, fieldPrime), ecGenPair, fieldPrime)
+}
+
+/*	def ec_add(point1: ECPoint, point2: ECPoint, p: int) -> ECPoint:
+m = div_mod(point1[1] - point2[1], point1[0] - point2[0], p)
+x = (m * m - point1[0] - point2[0]) % p
+y = (m * (point1[0] - x) - point1[1]) % p
+return x, y	*/
+// Gets two points on an elliptic curve mod p and returns their sum.
+// Assumes the points are given in affine form (x, y) and have different x coordinates.
+func ecAdd(ecPoint1, ecPoint2 [2]*big.Int, p *big.Int) [2]*big.Int {
+	m := divMod(new(big.Int).Sub(ecPoint1[1], ecPoint2[1]), new(big.Int).Sub(ecPoint1[0], ecPoint2[0]), p)
+	fmt.Print("M: ", m.String())
+	var ecPoint [2]*big.Int
+	ecPoint[0] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Mul(m, m), new(big.Int).Sub(ecPoint1[0], ecPoint2[0])), p)
+	ecPoint[1] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Mul(m, new(big.Int).Sub(ecPoint1[0], ecPoint[0])), ecPoint1[1]), p)
+	return ecPoint
+}
+
+/*	def ec_double(point: ECPoint, alpha: int, p: int) -> ECPoint:
+assert point[1] % p != 0
+m = div_mod(3 * point[0] * point[0] + alpha, 2 * point[1], p)
+x = (m * m - 2 * point[0]) % p
+y = (m * (point[0] - x) - point[1]) % p
+return x, y		*/
+// Doubles a point on an elliptic curve with the equation y^2 = x^3 + alpha*x + beta mod p.
+// Assumes the point is given in affine form (x, y) and has y != 0.
+func ecDouble(point [2]*big.Int, alpha, fieldPrime *big.Int) [2]*big.Int {
+	var rPoint [2]*big.Int
+	m := divMod(new(big.Int).Add(new(big.Int).Mul(big.NewInt(3), new(big.Int).Exp(point[0], big.NewInt(2), nil)), alpha), new(big.Int).Mul(big.NewInt(2), point[1]), fieldPrime)
+
+	rPoint[0] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Exp(m, big.NewInt(2), nil), new(big.Int).Mul(big.NewInt(2), point[0])), fieldPrime)
+	rPoint[1] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Mul(m, new(big.Int).Sub(point[0], rPoint[0])), point[1]), fieldPrime)
+	return rPoint
+}
+
+// Finds a nonnegative integer 0 <= x < b such that (a * x) % b == c
+func divMod(n, m, p *big.Int) *big.Int {
+	a := big.NewInt(0)
+	b := big.NewInt(0)
+	gcd := new(big.Int).GCD(a, b, m, p)
+	if gcd.Cmp(big.NewInt(1)) != 0 {
+		// TODO: remove this panic
+		panic("divMod: GCD not equal to 1")
+	}
+	return new(big.Int).Mod(new(big.Int).Mul(n, a), p)
+}
+
 func getSign(nonce string) (string, error) {
-	sign, err := signMethod(getHash(nonce))
+	sign, err := signMethod(getHash(nonce), SignatureTypeNOPrepend)
 	if err != nil {
 		return "", err
 	}
@@ -475,7 +578,7 @@ func getHashString(str string) []byte {
 	)
 }
 
-func signMethod(payload []byte) (string, error) {
+func signMethod(payload []byte, signType string) (string, error) {
 	privateKey, err := crypto.HexToECDSA("4107c052723f1a92e6a6f6fd81d6b20d75578637584a4c72808f1d44be6c473e")
 	if err != nil {
 		return "", err
@@ -486,14 +589,14 @@ func signMethod(payload []byte) (string, error) {
 		return "", err
 	}
 
-	tSign, err := createTypedSign(hexutil.Encode(signature))
+	tSign, err := createTypedSign(hexutil.Encode(signature), signType)
 	if err != nil {
 		return "", err
 	}
 	return tSign, nil
 }
 
-func createTypedSign(sign string) (string, error) {
+func createTypedSign(sign, signatureType string) (string, error) {
 	if strings.HasPrefix(sign, "0x") {
 		sign = sign[2:]
 	}
@@ -506,13 +609,13 @@ func createTypedSign(sign string) (string, error) {
 	v := sign[128:130]
 
 	if v == "00" {
-		return "0x" + rs + "1b" + "00", nil
+		return "0x" + rs + "1b" + "0" + signatureType, nil
 	}
 	if v == "01" {
-		return "0x" + rs + "1c" + "00", nil
+		return "0x" + rs + "1c" + "0" + signatureType, nil
 	}
 	if v == "1b" || v == "1c" {
-		return "0x" + sign + "00", nil
+		return "0x" + sign + "0" + signatureType, nil
 	}
 	return "", fmt.Errorf("invalid value of v: %s", v)
 }

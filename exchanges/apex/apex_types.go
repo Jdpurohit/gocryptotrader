@@ -13,6 +13,18 @@ var validIntervals = []string{
 	"D", "M", "W",
 }
 
+type SignatureType int
+
+const (
+	SignatureTypeNOPrepend   = "0"
+	SignatureTypeDecimal     = "1"
+	SignatureTypeHexaDecimal = "2"
+	SignatureTypePersonal    = "3"
+
+	StarkAlpha      = 1
+	StarkFieldPrime = "3618502788666131213697322783095070105623107215331596699973092056135872020481"
+)
+
 var (
 	errInvalidInterval             = errors.New("invalid interval")
 	errSymbolMissing               = errors.New("symbol missing")
