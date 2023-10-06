@@ -419,12 +419,6 @@ func privKeyToECPointOnStarkCurve(privKeyInt *big.Int) (string, string) {
 	return ecPoint[0].Text(16), ecPoint[1].Text(16)
 }
 
-/*	def ec_mult(m: int, point: ECPoint, alpha: int, p: int) -> ECPoint:
-if m == 1:
-    return point
-if m % 2 == 0:
-    return ec_mult(m // 2, ec_double(point, alpha, p), alpha, p)
-return ec_add(ec_mult(m - 1, point, alpha, p), point, p)	*/
 // Multiplies by m a point on the elliptic curve with equation y^2 = x^3 + alpha*x + beta mod p.
 // Assumes the point is given in affine form (x, y) and that 0 < m < order(point).
 func ecMult(privKeyInt *big.Int, ecGenPair [2]*big.Int, alpha, fieldPrime *big.Int) [2]*big.Int {
@@ -437,28 +431,17 @@ func ecMult(privKeyInt *big.Int, ecGenPair [2]*big.Int, alpha, fieldPrime *big.I
 	return ecAdd(ecMult(new(big.Int).Sub(privKeyInt, big.NewInt(1)), ecGenPair, alpha, fieldPrime), ecGenPair, fieldPrime)
 }
 
-/*	def ec_add(point1: ECPoint, point2: ECPoint, p: int) -> ECPoint:
-m = div_mod(point1[1] - point2[1], point1[0] - point2[0], p)
-x = (m * m - point1[0] - point2[0]) % p
-y = (m * (point1[0] - x) - point1[1]) % p
-return x, y	*/
 // Gets two points on an elliptic curve mod p and returns their sum.
 // Assumes the points are given in affine form (x, y) and have different x coordinates.
 func ecAdd(ecPoint1, ecPoint2 [2]*big.Int, p *big.Int) [2]*big.Int {
 	m := divMod(new(big.Int).Sub(ecPoint1[1], ecPoint2[1]), new(big.Int).Sub(ecPoint1[0], ecPoint2[0]), p)
 	fmt.Print("M: ", m.String())
 	var ecPoint [2]*big.Int
-	ecPoint[0] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Mul(m, m), new(big.Int).Sub(ecPoint1[0], ecPoint2[0])), p)
+	ecPoint[0] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Sub(new(big.Int).Mul(m, m), ecPoint1[0]), ecPoint2[0]), p)
 	ecPoint[1] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Mul(m, new(big.Int).Sub(ecPoint1[0], ecPoint[0])), ecPoint1[1]), p)
 	return ecPoint
 }
 
-/*	def ec_double(point: ECPoint, alpha: int, p: int) -> ECPoint:
-assert point[1] % p != 0
-m = div_mod(3 * point[0] * point[0] + alpha, 2 * point[1], p)
-x = (m * m - 2 * point[0]) % p
-y = (m * (point[0] - x) - point[1]) % p
-return x, y		*/
 // Doubles a point on an elliptic curve with the equation y^2 = x^3 + alpha*x + beta mod p.
 // Assumes the point is given in affine form (x, y) and has y != 0.
 func ecDouble(point [2]*big.Int, alpha, fieldPrime *big.Int) [2]*big.Int {
