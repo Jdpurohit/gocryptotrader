@@ -29,8 +29,9 @@ type Apex struct {
 }
 
 const (
-	apexAPIURL     = "https://pro.apex.exchange/api/"
-	apexAPIVersion = "v1"
+	apexAPIURL        = "https://pro.apex.exchange/api/"
+	apexAPIVersion    = "v1"
+	accountPrivateKey = "4107c052723f1a92e6a6f6fd81d6b20d75578637584a4c72808f1d44be6c473e"
 
 	// Public endpoints
 	apexSystemTime         = "/time"
@@ -254,7 +255,7 @@ func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID
 		return nil, errChainIDMissing
 	}
 	params.Set("chainId", chainID)
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexNonce, params, nil, &resp, publicSpotRate)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexNonce, params, &resp, publicSpotRate)
 }
 
 // Registration
@@ -284,7 +285,7 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 		params.Set("country", country)
 	}
 	params.Set("category", "CATEGORY_API")
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, nil, &resp, publicSpotRate)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, &resp, publicSpotRate)
 }
 
 // SendHTTPRequest sends an unauthenticated request
@@ -311,7 +312,7 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path st
 
 // SendAuthHTTPRequest sends an authenticated HTTP request
 // TODO: remove jsonPayload if non of the request requires it
-func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, jsonPayload map[string]interface{}, result UnmarshalTo, f request.EndpointLimit) error {
+func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, result UnmarshalTo, f request.EndpointLimit) error {
 	// creds, err := ap.GetCredentials(ctx)
 	// if err != nil {
 	// 	return err
@@ -328,9 +329,10 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 		params = url.Values{}
 	}
 
-	// eipMsg := getEIP712Message(params.Get("nonce"))
-	// msgHash := getHash(params.Get("nonce"))
-	//sign := getSign()
+	// TODO:
+	// call generate stark key once and store all keys
+	// call generate nonce everytime a private request is made
+	// sign := getSign("")
 
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		var (
@@ -350,7 +352,12 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 		//headers["APEX-API-KEY"] = creds.Key
 		//headers["APEX-PASSPHRASE"] = "UzmQ0kfonxwb_ZK6I4ue" // passphrase variable to be added
 
-		//headers["APEX-ETHEREUM-ADDRESS"] = params.Get("ethereumAddress")
+		sign, err := getSign("1517566403329392640")
+		if err != nil {
+			return nil, err
+		}
+		headers["APEX-SIGNATURE"] = sign
+		headers["APEX-ETHEREUM-ADDRESS"] = params.Get("ethereumAddress")
 
 		switch method {
 		case http.MethodPost:
@@ -382,8 +389,7 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 
 func deriveStarkKey() (string, string, error) {
 	msgStr := "name: ApeX\nversion: 1.0\nenvId: 1\naction: L2 Key\nonlySignOn: https://pro.apex.exchange"
-	//SoliditySHA3WithPrefix can use it instead
-	bHash := getHashString(fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(msgStr), msgStr))
+	bHash := solsha3.SoliditySHA3WithPrefix([]byte(msgStr))
 	fmt.Println("Bytes Hash: ", hex.EncodeToString(bHash))
 	sign, err := signMethod(bHash, SignatureTypePersonal)
 	if err != nil {
@@ -397,26 +403,23 @@ func deriveStarkKey() (string, string, error) {
 	m := new(big.Int)
 	m.SetString(hex.EncodeToString(bHashSign), 16)
 	fmt.Println("bHashSign Int: ", m.String())
+	// privKey := n.Text(16)
 
-	n := new(big.Int).Rsh(m, 5)
-	privKey := n.Text(16)
+	// // fmt.Println("privKey INT: ", n.String())
+	// // fmt.Println("privKey Hex: ", privKey)
 
-	fmt.Println("privKey INT: ", n.String())
-	fmt.Println("privKey Hex: ", privKey)
-
-	x, y := privKeyToECPointOnStarkCurve(n)
-	return x, y, nil
+	ecPoint := privKeyToECPointOnStarkCurve(new(big.Int).Rsh(m, 5))
+	return ecPoint[0].Text(16), ecPoint[1].Text(16), nil
 }
 
-func privKeyToECPointOnStarkCurve(privKeyInt *big.Int) (string, string) {
+func privKeyToECPointOnStarkCurve(privKeyInt *big.Int) [2]*big.Int {
 	a, _ := new(big.Int).SetString("874739451078007766457464989774322083649278607533249481151382481072868806602", 10)
 	b, _ := new(big.Int).SetString("152666792071518830868575557812948353041420400780739481342941381225525861407", 10)
 
-	c, _ := new(big.Int).SetString("1", 10)
-	d, _ := new(big.Int).SetString("3618502788666131213697322783095070105623107215331596699973092056135872020481", 10)
-
-	ecPoint := ecMult(privKeyInt, [2]*big.Int{a, b}, c, d)
-	return ecPoint[0].Text(16), ecPoint[1].Text(16)
+	ecGenerator := [2]*big.Int{a, b}
+	alpha, _ := new(big.Int).SetString("1", 10)
+	fieldPrime, _ := new(big.Int).SetString("3618502788666131213697322783095070105623107215331596699973092056135872020481", 10)
+	return ecMult(privKeyInt, ecGenerator, alpha, fieldPrime)
 }
 
 // Multiplies by m a point on the elliptic curve with equation y^2 = x^3 + alpha*x + beta mod p.
@@ -435,7 +438,6 @@ func ecMult(privKeyInt *big.Int, ecGenPair [2]*big.Int, alpha, fieldPrime *big.I
 // Assumes the points are given in affine form (x, y) and have different x coordinates.
 func ecAdd(ecPoint1, ecPoint2 [2]*big.Int, p *big.Int) [2]*big.Int {
 	m := divMod(new(big.Int).Sub(ecPoint1[1], ecPoint2[1]), new(big.Int).Sub(ecPoint1[0], ecPoint2[0]), p)
-	fmt.Print("M: ", m.String())
 	var ecPoint [2]*big.Int
 	ecPoint[0] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Sub(new(big.Int).Mul(m, m), ecPoint1[0]), ecPoint2[0]), p)
 	ecPoint[1] = new(big.Int).Mod(new(big.Int).Sub(new(big.Int).Mul(m, new(big.Int).Sub(ecPoint1[0], ecPoint[0])), ecPoint1[1]), p)
@@ -562,7 +564,7 @@ func getHashString(str string) []byte {
 }
 
 func signMethod(payload []byte, signType string) (string, error) {
-	privateKey, err := crypto.HexToECDSA("4107c052723f1a92e6a6f6fd81d6b20d75578637584a4c72808f1d44be6c473e")
+	privateKey, err := crypto.HexToECDSA(accountPrivateKey)
 	if err != nil {
 		return "", err
 	}
