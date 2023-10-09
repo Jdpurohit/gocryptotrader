@@ -32,6 +32,7 @@ const (
 	apexAPIURL        = "https://pro.apex.exchange/api/"
 	apexAPIVersion    = "v1"
 	accountPrivateKey = "4107c052723f1a92e6a6f6fd81d6b20d75578637584a4c72808f1d44be6c473e"
+	accountETHAddress = "0x4315c720e1c256A800B93c1742a6525fF40aB7C5"
 
 	// Public endpoints
 	apexSystemTime         = "/time"
@@ -56,7 +57,7 @@ func (ap *Apex) GetSystemTime(ctx context.Context) (time.Time, error) {
 		} `json:"data"`
 		Error
 	}{}
-	return resp.Data.Time.Time(), ap.SendHTTPRequest(ctx, exchange.RestSpot, apexSystemTime, publicSpotRate, &resp)
+	return resp.Data.Time.Time(), ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexSystemTime, publicSpotRate, &resp)
 }
 
 // GetAllConfigData gets all config data
@@ -66,7 +67,7 @@ func (ap *Apex) GetAllConfig(ctx context.Context) (Config, error) {
 		TimeCost int64  `json:"timeCost"`
 		Error
 	}{}
-	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, apexAllConfigData, publicSpotRate, &resp)
+	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexAllConfigData, publicSpotRate, &resp)
 }
 
 // GetMarketDepthData retrieve all active orderbook for one symbol, inclue all bids and asks.
@@ -79,7 +80,7 @@ func (ap *Apex) GetMarketDepth(ctx context.Context, symbol string, limit int64) 
 		params.Set("limit", strconv.FormatInt(limit, 10))
 	}
 	path := common.EncodeURLValues(apexMarketDepth, params)
-	err := ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &o)
+	err := ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, publicSpotRate, &o)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +139,7 @@ func (ap *Apex) GetLatestTrades(ctx context.Context, symbol string, limit, from 
 		params.Set("from", strconv.FormatInt(from, 10))
 	}
 	path := common.EncodeURLValues(apexLatestTrades, params)
-	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, publicSpotRate, &resp)
 }
 
 // GetCandlestickChart retrieves all candlestick chart data.
@@ -171,7 +172,7 @@ func (ap *Apex) GetCandlestickChart(ctx context.Context, interval, symbol string
 		params.Set("limit", strconv.FormatInt(limit, 10))
 	}
 	path := common.EncodeURLValues(apexKlines, params)
-	return resp.Data[symbol], ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+	return resp.Data[symbol], ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, publicSpotRate, &resp)
 }
 
 // GetTicker retrieves the latest data on symbol tickers.
@@ -187,7 +188,7 @@ func (ap *Apex) GetTicker(ctx context.Context, symbol string) ([]TickerData, err
 	}
 	params.Set("symbol", symbol)
 	path := common.EncodeURLValues(apexTicker, params)
-	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, publicSpotRate, &resp)
 }
 
 // GetFundingRateHistory retrieves the funding rate history.
@@ -217,7 +218,7 @@ func (ap *Apex) GetFundingRateHistory(ctx context.Context, symbol string, startT
 		params.Set("page", strconv.FormatInt(page, 10))
 	}
 	path := common.EncodeURLValues(apexFundingRateHistory, params)
-	return resp.Data.FundingHistory, ap.SendHTTPRequest(ctx, exchange.RestSpot, path, publicSpotRate, &resp)
+	return resp.Data.FundingHistory, ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, publicSpotRate, &resp)
 }
 
 // CheckIfUserExists validates if user exists in the system.
@@ -231,12 +232,12 @@ func (ap *Apex) CheckIfUserExists(ctx context.Context, ethAddress string) (bool,
 	if ethAddress != "" {
 		params.Set("ethAddress", ethAddress)
 	}
-
-	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, apexCheckUserExists, publicSpotRate, &resp)
+	path := common.EncodeURLValues(apexCheckUserExists, params)
+	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, publicSpotRate, &resp)
 }
 
 // GenerateNonce generate and obtain nonce.
-func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID string) (*NonceData, error) {
+func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID string) (NonceData, error) {
 	resp := struct {
 		Data NonceData `json:"data"`
 		Error
@@ -244,22 +245,24 @@ func (ap *Apex) GenerateNonce(ctx context.Context, ethAddress, starkKey, chainID
 
 	params := url.Values{}
 	if ethAddress == "" {
-		return nil, errETHAddressMissing
+		return resp.Data, errETHAddressMissing
 	}
 	params.Set("ethAddress", ethAddress)
 	if starkKey == "" {
-		return nil, errStarkKeyMissing
+		return resp.Data, errStarkKeyMissing
 	}
 	params.Set("starkKey", starkKey)
 	if chainID == "" {
-		return nil, errChainIDMissing
+		return resp.Data, errChainIDMissing
 	}
 	params.Set("chainId", chainID)
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexNonce, params, &resp, publicSpotRate)
+	params.Set("category", "CATEGORY_API")
+	path := common.EncodeURLValues(apexNonce, params)
+	return resp.Data, ap.SendHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, path, publicSpotRate, &resp)
 }
 
-// Registration
-func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate, ethAddress, referredByAffiliateLink, country string) (interface{}, error) {
+// Registration and User Onboarding
+func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate, ethAddress, referredByAffiliateLink, country, chainID string) (interface{}, error) {
 	resp := struct {
 		Data interface{} `json:"data"`
 		Error
@@ -285,11 +288,26 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 		params.Set("country", country)
 	}
 	params.Set("category", "CATEGORY_API")
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, &resp, publicSpotRate)
+
+	// generate new nonce and use it
+	nonce, err := ap.GenerateNonce(ctx, ethAddress, starkKey, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	sign, err := getSign(nonce.Nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := make(map[string]string)
+	headers["APEX-SIGNATURE"] = sign
+	headers["APEX-ETHEREUM-ADDRESS"] = accountETHAddress
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, headers, &resp, publicSpotRate, true)
 }
 
 // SendHTTPRequest sends an unauthenticated request
-func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path string, f request.EndpointLimit, result UnmarshalTo) error {
+func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, f request.EndpointLimit, result UnmarshalTo) error {
 	endpointPath, err := ap.API.Endpoints.GetURL(ePath)
 	if err != nil {
 		return err
@@ -297,7 +315,7 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path st
 
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		return &request.Item{
-			Method:        http.MethodGet,
+			Method:        method,
 			Path:          endpointPath + apexAPIVersion + path,
 			Result:        result,
 			Verbose:       ap.Verbose,
@@ -312,11 +330,15 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path st
 
 // SendAuthHTTPRequest sends an authenticated HTTP request
 // TODO: remove jsonPayload if non of the request requires it
-func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, result UnmarshalTo, f request.EndpointLimit) error {
-	// creds, err := ap.GetCredentials(ctx)
-	// if err != nil {
-	// 	return err
-	// }
+func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, headers map[string]string, result UnmarshalTo, f request.EndpointLimit, isRegisterAPI bool) error {
+	if headers != nil && !isRegisterAPI {
+		creds, err := ap.GetCredentials(ctx)
+		if err != nil {
+			return err
+		}
+		headers["APEX-API-KEY"] = creds.Key
+		headers["APEX-PASSPHRASE"] = creds.Secret
+	}
 
 	if result == nil {
 		result = &Error{}
@@ -339,7 +361,6 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 			payload []byte
 			//		hmacSignedStr string
 		)
-		headers := make(map[string]string)
 
 		//	timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 		//	message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
@@ -352,16 +373,9 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 		//headers["APEX-API-KEY"] = creds.Key
 		//headers["APEX-PASSPHRASE"] = "UzmQ0kfonxwb_ZK6I4ue" // passphrase variable to be added
 
-		sign, err := getSign("1517566403329392640")
-		if err != nil {
-			return nil, err
-		}
-		headers["APEX-SIGNATURE"] = sign
-		headers["APEX-ETHEREUM-ADDRESS"] = params.Get("ethereumAddress")
-
 		switch method {
 		case http.MethodPost:
-			headers["Content-Type"] = "application/x-www-form-urlencoded" // required for getNonce
+			headers["Content-Type"] = "application/x-www-form-urlencoded" // required for all private API
 		}
 		payload = []byte(params.Encode())
 		// if jsonPayload != nil {
