@@ -331,7 +331,11 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, method,
 // SendAuthHTTPRequest sends an authenticated HTTP request
 // TODO: remove jsonPayload if non of the request requires it
 func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, headers map[string]string, result UnmarshalTo, f request.EndpointLimit, isRegisterAPI bool) error {
-	if headers != nil && !isRegisterAPI {
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+
+	if !isRegisterAPI {
 		creds, err := ap.GetCredentials(ctx)
 		if err != nil {
 			return err
@@ -354,41 +358,18 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 	// TODO:
 	// call generate stark key once and store all keys
 	// call generate nonce everytime a private request is made
-	// sign := getSign("")
+	// sign the request
 
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
-		var (
-			payload []byte
-			//		hmacSignedStr string
-		)
-
-		//	timeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
-		//	message := timeStr + method + "/api/" + apexAPIVersion + path + params.Encode()
-		// hmacSignedStr, err = getSign(params.Get("action"), params.Get("nonce"))
-		// if err != nil {
-		// 	return nil, err
-		// }
-		//headers["APEX-SIGNATURE"] = hmacSignedStr
-		//	headers["APEX-TIMESTAMP"] = timeStr
-		//headers["APEX-API-KEY"] = creds.Key
-		//headers["APEX-PASSPHRASE"] = "UzmQ0kfonxwb_ZK6I4ue" // passphrase variable to be added
-
 		switch method {
 		case http.MethodPost:
 			headers["Content-Type"] = "application/x-www-form-urlencoded" // required for all private API
 		}
-		payload = []byte(params.Encode())
-		// if jsonPayload != nil {
-		// 	payload, err = json.Marshal(jsonPayload)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
 		return &request.Item{
 			Method:        method,
 			Path:          endpointPath + apexAPIVersion + path,
 			Headers:       headers,
-			Body:          bytes.NewBuffer(payload),
+			Body:          bytes.NewBuffer([]byte(params.Encode())),
 			Result:        &result,
 			AuthRequest:   true,
 			Verbose:       ap.Verbose,
