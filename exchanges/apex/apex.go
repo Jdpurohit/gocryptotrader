@@ -47,6 +47,7 @@ const (
 	// Authenticated endpoints
 	apexNonce        = "/generate-nonce"
 	apexRegistration = "/onboarding"
+	apexUserData     = "/user"
 )
 
 // GetSystemTime gets system time
@@ -306,6 +307,51 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, headers, &resp, publicSpotRate, true)
 }
 
+// GetUserData
+func (ap *Apex) GetUserData(ctx context.Context, starkKey, starkKeyYCoordinate, ethAddress, referredByAffiliateLink, country, chainID string) (interface{}, error) {
+	resp := struct {
+		Data interface{} `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if starkKey == "" {
+		return nil, errStarkKeyMissing
+	}
+	params.Set("starkKey", starkKey)
+	if starkKeyYCoordinate == "" {
+		return nil, errStarkKeyYCoordinateMisssing
+	}
+	params.Set("starkKeyYCoordinate", starkKeyYCoordinate)
+	if ethAddress == "" {
+		return nil, errETHAddressMissing
+	}
+	params.Set("ethereumAddress", ethAddress)
+	if referredByAffiliateLink != "" {
+		params.Set("referredByAffiliateLink", referredByAffiliateLink)
+	}
+	if country != "" {
+		params.Set("country", country)
+	}
+	params.Set("category", "CATEGORY_API")
+
+	// generate new nonce and use it
+	nonce, err := ap.GenerateNonce(ctx, ethAddress, starkKey, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	sign, err := getSign(nonce.Nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := make(map[string]string)
+	headers["APEX-SIGNATURE"] = sign
+	headers["APEX-ETHEREUM-ADDRESS"] = accountETHAddress
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexUserData, params, headers, &resp, publicSpotRate, true)
+}
+
 // SendHTTPRequest sends an unauthenticated request
 func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, f request.EndpointLimit, result UnmarshalTo) error {
 	endpointPath, err := ap.API.Endpoints.GetURL(ePath)
@@ -329,7 +375,6 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, method,
 }
 
 // SendAuthHTTPRequest sends an authenticated HTTP request
-// TODO: remove jsonPayload if non of the request requires it
 func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, params url.Values, headers map[string]string, result UnmarshalTo, f request.EndpointLimit, isRegisterAPI bool) error {
 	if headers == nil {
 		headers = make(map[string]string)
