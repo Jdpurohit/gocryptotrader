@@ -15,6 +15,10 @@ import (
 const (
 	apiKey                  = "9f5f77ef-af79-753d-50c2-7e2fb616f325"
 	apiSecret               = "PuCImUEXK5z2kEtpAb5q"
+	starkKey                = "0x7c9fec5834aaa1e30143544ee0d8ed91025d1336bb188d57592d5e64e5b7c5f"
+	starkKeyYCoordinate     = "0x2d99d8e5060171bac631b7efd7d97464fc98b0efcee87aef3a9eca1f965b569"
+	ethAddress              = "0x4315c720e1c256A800B93c1742a6525fF40aB7C5"
+	chainID                 = "1"
 	canManipulateRealOrders = false
 )
 
@@ -133,7 +137,7 @@ func TestGenerateNonce(t *testing.T) {
 	if !areTestAPIKeysSet() {
 		t.Skip("skipping test: api keys not set")
 	}
-	_, err := ap.GenerateNonce(context.Background(), "0x4315c720e1c256A800B93c1742a6525fF40aB7C5", "0x7c9fec5834aaa1e30143544ee0d8ed91025d1336bb188d57592d5e64e5b7c5f", "1")
+	_, err := ap.GenerateNonce(context.Background(), ethAddress, starkKey, chainID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +145,7 @@ func TestGenerateNonce(t *testing.T) {
 
 func TestRegistration(t *testing.T) {
 	t.Parallel()
-	_, err := ap.Registration(context.Background(), "0x7c9fec5834aaa1e30143544ee0d8ed91025d1336bb188d57592d5e64e5b7c5f", "0x2d99d8e5060171bac631b7efd7d97464fc98b0efcee87aef3a9eca1f965b569", "0x4315c720e1c256A800B93c1742a6525fF40aB7C5", "", "", "1")
+	_, err := ap.Registration(context.Background(), starkKey, starkKeyYCoordinate, ethAddress, "", "", chainID)
 	if err != nil {
 		t.Fatal(err)
 	}
