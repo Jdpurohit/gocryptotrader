@@ -21,7 +21,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	solsha3 "github.com/miguelmota/go-solidity-sha3"
+	commonCrypto "github.com/thrasher-corp/gocryptotrader/common/crypto"
 )
+
+// TODO: declare private API response structure, currently interface are used
 
 // Apex is the overarching type across this package
 type Apex struct {
@@ -29,8 +32,9 @@ type Apex struct {
 }
 
 const (
-	apexAPIURL        = "https://pro.apex.exchange/api/"
-	apexAPIVersion    = "v1"
+	apexAPIBaseURL    = "https://pro.apex.exchange"
+	apexAPIPath       = "/api"
+	apexAPIVersion    = "/v1"
 	accountPrivateKey = "4107c052723f1a92e6a6f6fd81d6b20d75578637584a4c72808f1d44be6c473e"
 	accountETHAddress = "0x4315c720e1c256A800B93c1742a6525fF40aB7C5"
 
@@ -307,49 +311,33 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexRegistration, params, headers, &resp, publicSpotRate, true)
 }
 
-// GetUserData
-func (ap *Apex) GetUserData(ctx context.Context, starkKey, starkKeyYCoordinate, ethAddress, referredByAffiliateLink, country, chainID string) (interface{}, error) {
+// GetUserData gets user details
+func (ap *Apex) GetUserData(ctx context.Context) (interface{}, error) {
 	resp := struct {
 		Data interface{} `json:"data"`
 		Error
 	}{}
 
-	params := url.Values{}
-	if starkKey == "" {
-		return nil, errStarkKeyMissing
-	}
-	params.Set("starkKey", starkKey)
-	if starkKeyYCoordinate == "" {
-		return nil, errStarkKeyYCoordinateMisssing
-	}
-	params.Set("starkKeyYCoordinate", starkKeyYCoordinate)
-	if ethAddress == "" {
-		return nil, errETHAddressMissing
-	}
-	params.Set("ethereumAddress", ethAddress)
-	if referredByAffiliateLink != "" {
-		params.Set("referredByAffiliateLink", referredByAffiliateLink)
-	}
-	if country != "" {
-		params.Set("country", country)
-	}
-	params.Set("category", "CATEGORY_API")
-
-	// generate new nonce and use it
-	nonce, err := ap.GenerateNonce(ctx, ethAddress, starkKey, chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	sign, err := getSign(nonce.Nonce)
-	if err != nil {
-		return nil, err
-	}
-
 	headers := make(map[string]string)
-	headers["APEX-SIGNATURE"] = sign
-	headers["APEX-ETHEREUM-ADDRESS"] = accountETHAddress
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexUserData, params, headers, &resp, publicSpotRate, true)
+	timeStamp := time.Now().UnixMilli()
+	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	headers["APEX-TIMESTAMP"] = timeStampStr
+
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + apexUserData
+	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
+		[]byte(signMsg),
+		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
+	)
+	if err != nil {
+		return nil, err
+	}
+	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
+
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexUserData, nil, headers, &resp, publicSpotRate, false)
 }
 
 // SendHTTPRequest sends an unauthenticated request
@@ -362,7 +350,7 @@ func (ap *Apex) SendHTTPRequest(ctx context.Context, ePath exchange.URL, method,
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		return &request.Item{
 			Method:        method,
-			Path:          endpointPath + apexAPIVersion + path,
+			Path:          endpointPath + apexAPIPath + apexAPIVersion + path,
 			Result:        result,
 			Verbose:       ap.Verbose,
 			HTTPDebugging: ap.HTTPDebugging,
@@ -386,7 +374,8 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 			return err
 		}
 		headers["APEX-API-KEY"] = creds.Key
-		headers["APEX-PASSPHRASE"] = creds.Secret
+		// TODO: add new parameter in credentials named as passphrase
+		headers["APEX-PASSPHRASE"] = creds.OneTimePassword
 	}
 
 	if result == nil {
@@ -412,7 +401,7 @@ func (ap *Apex) SendAuthHTTPRequest(ctx context.Context, ePath exchange.URL, met
 		}
 		return &request.Item{
 			Method:        method,
-			Path:          endpointPath + apexAPIVersion + path,
+			Path:          endpointPath + apexAPIPath + apexAPIVersion + path,
 			Headers:       headers,
 			Body:          bytes.NewBuffer([]byte(params.Encode())),
 			Result:        &result,

@@ -14,7 +14,8 @@ import (
 // Please supply your own keys here to do authenticated endpoint testing
 const (
 	apiKey                  = "9f5f77ef-af79-753d-50c2-7e2fb616f325"
-	apiSecret               = "PuCImUEXK5z2kEtpAb5q"
+	apiSecret               = "SjA0vk_kz57DVlWJmjg_j2UtuSAImI0Y31WPP3GU"
+	passPhrase              = "PuCImUEXK5z2kEtpAb5q"
 	starkKey                = "0x7c9fec5834aaa1e30143544ee0d8ed91025d1336bb188d57592d5e64e5b7c5f"
 	starkKeyYCoordinate     = "0x2d99d8e5060171bac631b7efd7d97464fc98b0efcee87aef3a9eca1f965b569"
 	ethAddress              = "0x4315c720e1c256A800B93c1742a6525fF40aB7C5"
@@ -41,6 +42,7 @@ func TestMain(m *testing.M) {
 	exchCfg.API.AuthenticatedWebsocketSupport = true
 	exchCfg.API.Credentials.Key = apiKey
 	exchCfg.API.Credentials.Secret = apiSecret
+	exchCfg.API.Credentials.OTPSecret = passPhrase // TODO: add new parameter in credentials named as passphrase
 	exchCfg.Verbose = true
 	err = ap.Setup(exchCfg)
 	if err != nil {
@@ -146,6 +148,17 @@ func TestGenerateNonce(t *testing.T) {
 func TestRegistration(t *testing.T) {
 	t.Parallel()
 	_, err := ap.Registration(context.Background(), starkKey, starkKeyYCoordinate, ethAddress, "", "", chainID)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetUserData(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.GetUserData(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

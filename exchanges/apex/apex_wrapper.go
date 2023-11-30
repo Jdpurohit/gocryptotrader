@@ -121,7 +121,7 @@ func (ap *Apex) SetDefaults() {
 	// NOTE: SET THE URLs HERE
 	ap.API.Endpoints = ap.NewEndpoints()
 	ap.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
-		exchange.RestSpot: apexAPIURL,
+		exchange.RestSpot: apexAPIBaseURL,
 		// exchange.WebsocketSpot: apexWSAPIURL,
 	})
 	ap.Websocket = stream.New()
