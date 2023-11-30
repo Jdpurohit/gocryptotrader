@@ -174,3 +174,14 @@ func TestModifyUserData(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetUserAccount(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.GetUserAccount(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}

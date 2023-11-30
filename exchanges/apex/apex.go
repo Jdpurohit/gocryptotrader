@@ -53,6 +53,7 @@ const (
 	apexRegistration = "/onboarding"
 	apexUser         = "/user"
 	apexModifyUser   = "/modify-user"
+	apexAccount      = "/account"
 )
 
 // GetSystemTime gets system time
@@ -416,6 +417,34 @@ func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, c
 	}
 	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
 	return resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexModifyUser, params, headers, &resp, publicSpotRate, false)
+}
+
+// GetUserAccount gets user account data
+func (ap *Apex) GetUserAccount(ctx context.Context) (interface{}, error) {
+	resp := struct {
+		Data interface{} `json:"data"`
+		Error
+	}{}
+
+	headers := make(map[string]string)
+	timeStamp := time.Now().UnixMilli()
+	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	headers["APEX-TIMESTAMP"] = timeStampStr
+
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + apexAccount
+	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
+		[]byte(signMsg),
+		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
+	)
+	if err != nil {
+		return nil, err
+	}
+	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexAccount, nil, headers, &resp, publicSpotRate, false)
 }
 
 // SendHTTPRequest sends an unauthenticated request
