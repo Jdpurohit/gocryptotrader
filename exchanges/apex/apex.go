@@ -313,9 +313,9 @@ func (ap *Apex) Registration(ctx context.Context, starkKey, starkKeyYCoordinate,
 }
 
 // GetUserData gets user details
-func (ap *Apex) GetUserData(ctx context.Context) (interface{}, error) {
+func (ap *Apex) GetUserData(ctx context.Context) (UserInfo, error) {
 	resp := struct {
-		Data interface{} `json:"data"`
+		Data UserInfo `json:"data"`
 		Error
 	}{}
 
@@ -326,7 +326,7 @@ func (ap *Apex) GetUserData(ctx context.Context) (interface{}, error) {
 
 	creds, err := ap.GetCredentials(ctx)
 	if err != nil {
-		return nil, err
+		return UserInfo{}, err
 	}
 	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + apexUser
 	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
@@ -334,16 +334,16 @@ func (ap *Apex) GetUserData(ctx context.Context) (interface{}, error) {
 		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
 	)
 	if err != nil {
-		return nil, err
+		return UserInfo{}, err
 	}
 	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexUser, nil, headers, &resp, publicSpotRate, false)
+	return resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexUser, nil, headers, &resp, publicSpotRate, false)
 }
 
 // ModifyUserData
-func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, country string, isSharingUsername, isSharingAddress, emailNotifyGeneralEnable, emailNotifyTradingEnable, emailNotifyAccountEnable, popupNotifyTradingEnable bool) (interface{}, error) {
+func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, country string, isSharingUsername, isSharingAddress, emailNotifyGeneralEnable, emailNotifyTradingEnable, emailNotifyAccountEnable, popupNotifyTradingEnable bool) (UserInfo, error) {
 	resp := struct {
-		Data interface{} `json:"data"`
+		Data UserInfo `json:"data"`
 		Error
 	}{}
 
@@ -398,12 +398,12 @@ func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, c
 
 	creds, err := ap.GetCredentials(ctx)
 	if err != nil {
-		return nil, err
+		return UserInfo{}, err
 	}
 
 	unescapeParam, err := url.PathUnescape(params.Encode())
 	if err != nil {
-		return nil, err
+		return UserInfo{}, err
 	}
 
 	signMsg := timeStampStr + http.MethodPost + apexAPIPath + apexAPIVersion + apexModifyUser + unescapeParam
@@ -412,10 +412,10 @@ func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, c
 		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
 	)
 	if err != nil {
-		return nil, err
+		return UserInfo{}, err
 	}
 	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexModifyUser, params, headers, &resp, publicSpotRate, false)
+	return resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexModifyUser, params, headers, &resp, publicSpotRate, false)
 }
 
 // SendHTTPRequest sends an unauthenticated request

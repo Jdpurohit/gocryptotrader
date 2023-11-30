@@ -251,3 +251,16 @@ type NonceData struct {
 	Nonce       string           `json:"nonce"`
 	NonceExpiry apexTimeMilliSec `json:"nonceExpired"`
 }
+
+type UserInfo struct {
+	EthereumAddress          string      `json:"ethereumAddress"`
+	IsRegistered             bool        `json:"isRegistered"`
+	Email                    string      `json:"email"`
+	Username                 string      `json:"username"`
+	UserData                 interface{} `json:"userData"`
+	IsEmailVerified          bool        `json:"isEmailVerified"`
+	EmailNotifyGeneralEnable bool        `json:"emailNotifyGeneralEnable"`
+	EmailNotifyTradingEnable bool        `json:"emailNotifyTradingEnable"`
+	EmailNotifyAccountEnable bool        `json:"emailNotifyAccountEnable"`
+	PopupNotifyTradingEnable bool        `json:"popupNotifyTradingEnable"`
+}
