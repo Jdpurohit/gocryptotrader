@@ -163,3 +163,14 @@ func TestGetUserData(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestModifyUserData(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.ModifyUserData(context.Background(), "", "golangtest@gmail.com", "golangTest", "", false, false, false, false, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

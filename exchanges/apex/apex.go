@@ -51,7 +51,8 @@ const (
 	// Authenticated endpoints
 	apexNonce        = "/generate-nonce"
 	apexRegistration = "/onboarding"
-	apexUserData     = "/user"
+	apexUser         = "/user"
+	apexModifyUser   = "/modify-user"
 )
 
 // GetSystemTime gets system time
@@ -327,7 +328,7 @@ func (ap *Apex) GetUserData(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + apexUserData
+	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + apexUser
 	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
 		[]byte(signMsg),
 		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
@@ -336,8 +337,85 @@ func (ap *Apex) GetUserData(ctx context.Context) (interface{}, error) {
 		return nil, err
 	}
 	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexUser, nil, headers, &resp, publicSpotRate, false)
+}
 
-	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexUserData, nil, headers, &resp, publicSpotRate, false)
+// ModifyUserData
+func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, country string, isSharingUsername, isSharingAddress, emailNotifyGeneralEnable, emailNotifyTradingEnable, emailNotifyAccountEnable, popupNotifyTradingEnable bool) (interface{}, error) {
+	resp := struct {
+		Data interface{} `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if userData != "" {
+		params.Set("userData", userData)
+	}
+	if email != "" {
+		params.Set("email", email)
+	}
+	if username != "" {
+		params.Set("username", username)
+	}
+	if country != "" {
+		params.Set("country", country)
+	}
+	if isSharingUsername {
+		params.Set("isSharingUsername", "true")
+	} else {
+		params.Set("isSharingUsername", "false")
+	}
+	if isSharingAddress {
+		params.Set("isSharingAddress", "true")
+	} else {
+		params.Set("isSharingAddress", "false")
+	}
+	if emailNotifyGeneralEnable {
+		params.Set("emailNotifyGeneralEnable", "true")
+	} else {
+		params.Set("emailNotifyGeneralEnable", "false")
+	}
+	if emailNotifyTradingEnable {
+		params.Set("emailNotifyTradingEnable", "true")
+	} else {
+		params.Set("emailNotifyTradingEnable", "false")
+	}
+	if emailNotifyAccountEnable {
+		params.Set("emailNotifyAccountEnable", "true")
+	} else {
+		params.Set("emailNotifyAccountEnable", "false")
+	}
+	if popupNotifyTradingEnable {
+		params.Set("popupNotifyTradingEnable", "true")
+	} else {
+		params.Set("popupNotifyTradingEnable", "false")
+	}
+
+	headers := make(map[string]string)
+	timeStamp := time.Now().UnixMilli()
+	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	headers["APEX-TIMESTAMP"] = timeStampStr
+
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	unescapeParam, err := url.PathUnescape(params.Encode())
+	if err != nil {
+		return nil, err
+	}
+
+	signMsg := timeStampStr + http.MethodPost + apexAPIPath + apexAPIVersion + apexModifyUser + unescapeParam
+	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
+		[]byte(signMsg),
+		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
+	)
+	if err != nil {
+		return nil, err
+	}
+	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
+	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, apexModifyUser, params, headers, &resp, publicSpotRate, false)
 }
 
 // SendHTTPRequest sends an unauthenticated request
