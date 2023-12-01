@@ -322,8 +322,7 @@ func (ap *Apex) GetUserData(ctx context.Context) (UserInfo, error) {
 	}{}
 
 	headers := make(map[string]string)
-	timeStamp := time.Now().UnixMilli()
-	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	headers["APEX-TIMESTAMP"] = timeStampStr
 
 	creds, err := ap.GetCredentials(ctx)
@@ -394,8 +393,7 @@ func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, c
 	}
 
 	headers := make(map[string]string)
-	timeStamp := time.Now().UnixMilli()
-	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	headers["APEX-TIMESTAMP"] = timeStampStr
 
 	creds, err := ap.GetCredentials(ctx)
@@ -429,8 +427,7 @@ func (ap *Apex) GetUserAccount(ctx context.Context) (interface{}, error) {
 	}{}
 
 	headers := make(map[string]string)
-	timeStamp := time.Now().UnixMilli()
-	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	headers["APEX-TIMESTAMP"] = timeStampStr
 
 	creds, err := ap.GetCredentials(ctx)
@@ -457,8 +454,7 @@ func (ap *Apex) GetAccountBalance(ctx context.Context) (AccountBalance, error) {
 	}{}
 
 	headers := make(map[string]string)
-	timeStamp := time.Now().UnixMilli()
-	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	headers["APEX-TIMESTAMP"] = timeStampStr
 
 	creds, err := ap.GetCredentials(ctx)
