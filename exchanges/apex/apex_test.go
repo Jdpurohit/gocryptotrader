@@ -185,3 +185,14 @@ func TestGetUserAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetAccountBalance(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.GetAccountBalance(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}

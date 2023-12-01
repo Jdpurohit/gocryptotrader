@@ -49,11 +49,12 @@ const (
 	apexCheckUserExists    = "/check-user-exist"
 
 	// Authenticated endpoints
-	apexNonce        = "/generate-nonce"
-	apexRegistration = "/onboarding"
-	apexUser         = "/user"
-	apexModifyUser   = "/modify-user"
-	apexAccount      = "/account"
+	apexNonce          = "/generate-nonce"
+	apexRegistration   = "/onboarding"
+	apexUser           = "/user"
+	apexModifyUser     = "/modify-user"
+	apexAccount        = "/account"
+	apexAccountBalance = "/account-balance"
 )
 
 // GetSystemTime gets system time
@@ -341,7 +342,7 @@ func (ap *Apex) GetUserData(ctx context.Context) (UserInfo, error) {
 	return resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexUser, nil, headers, &resp, publicSpotRate, false)
 }
 
-// ModifyUserData
+// ModifyUserData enables to modify user data
 func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, country string, isSharingUsername, isSharingAddress, emailNotifyGeneralEnable, emailNotifyTradingEnable, emailNotifyAccountEnable, popupNotifyTradingEnable bool) (UserInfo, error) {
 	resp := struct {
 		Data UserInfo `json:"data"`
@@ -402,6 +403,7 @@ func (ap *Apex) ModifyUserData(ctx context.Context, userData, email, username, c
 		return UserInfo{}, err
 	}
 
+	// we need query string without escape characters
 	unescapeParam, err := url.PathUnescape(params.Encode())
 	if err != nil {
 		return UserInfo{}, err
@@ -445,6 +447,34 @@ func (ap *Apex) GetUserAccount(ctx context.Context) (interface{}, error) {
 	}
 	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
 	return &resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexAccount, nil, headers, &resp, publicSpotRate, false)
+}
+
+// GetAccountBalance gets user account balance
+func (ap *Apex) GetAccountBalance(ctx context.Context) (AccountBalance, error) {
+	resp := struct {
+		Data AccountBalance `json:"data"`
+		Error
+	}{}
+
+	headers := make(map[string]string)
+	timeStamp := time.Now().UnixMilli()
+	timeStampStr := strconv.FormatInt(timeStamp, 10)
+	headers["APEX-TIMESTAMP"] = timeStampStr
+
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return AccountBalance{}, err
+	}
+	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + apexAccountBalance
+	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
+		[]byte(signMsg),
+		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
+	)
+	if err != nil {
+		return AccountBalance{}, err
+	}
+	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
+	return resp.Data, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, apexAccountBalance, nil, headers, &resp, publicSpotRate, false)
 }
 
 // SendHTTPRequest sends an unauthenticated request

@@ -264,3 +264,11 @@ type UserInfo struct {
 	EmailNotifyAccountEnable bool        `json:"emailNotifyAccountEnable"`
 	PopupNotifyTradingEnable bool        `json:"popupNotifyTradingEnable"`
 }
+
+type AccountBalance struct {
+	TotalEquityValue    float64     `json:"totalEquityValue,string"`
+	AvailableBalance    float64     `json:"availableBalance,string"`
+	InitialMargin       float64     `json:"initialMargin,string"`
+	MaintenanceMargin   float64     `json:"maintenanceMargin,string"`
+	SymbolToOraclePrice interface{} `json:"symbolToOraclePrice"`
+}
