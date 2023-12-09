@@ -272,3 +272,21 @@ type AccountBalance struct {
 	MaintenanceMargin   float64     `json:"maintenanceMargin,string"`
 	SymbolToOraclePrice interface{} `json:"symbolToOraclePrice"`
 }
+
+type Transfer struct {
+	ID              string  `json:"id"`
+	TransferType    string  `json:"type"`
+	CurrencyID      string  `json:"currencyId"`
+	Amount          float64 `json:"amount,string"`
+	TransactionHash string  `json:"transactionHash"`
+	Status          string  `json:"status"`
+	CreatedAt       int64   `json:"createdAt"`
+	UpdatedTime     int64   `json:"updatedTime"`
+	ConfirmedAt     int64   `json:"confirmedAt"`
+	ClientID        string  `json:"clientId"`
+	ConfirmedCount  int64   `json:"confirmedCount"`
+	RequiredCount   int64   `json:"requiredCount"`
+	OrderId         string  `json:"orderId"`
+	ChainId         string  `json:"chainId"`
+	Fee             float64 `json:"fee,string"`
+}
