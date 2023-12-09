@@ -207,3 +207,14 @@ func TestGetDepositList(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetWithdrawalList(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.GetWithdrawalList(context.Background(), 50, 0, "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+}

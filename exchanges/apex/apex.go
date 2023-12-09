@@ -56,6 +56,7 @@ const (
 	apexAccount        = "/account"
 	apexAccountBalance = "/account-balance"
 	apexDeposit        = "/transfers"
+	apexWithdraw       = "/withdraw-list"
 )
 
 // GetSystemTime gets system time
@@ -507,6 +508,53 @@ func (ap *Apex) GetDepositList(ctx context.Context, limit, page int64, currencyI
 	}
 
 	path := common.EncodeURLValues(apexDeposit, params)
+	headers := make(map[string]string)
+	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	headers["APEX-TIMESTAMP"] = timeStampStr
+
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + path
+	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
+		[]byte(signMsg),
+		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
+	)
+	if err != nil {
+		return nil, err
+	}
+	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
+	return resp.Data.Transfers, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, nil, headers, &resp, publicSpotRate, false)
+}
+
+// GetWithdrawalList gets all user withdrawal transaction
+func (ap *Apex) GetWithdrawalList(ctx context.Context, limit, page int64, beginTimeInclusive, endTimeExclusive, transferType string) ([]Transfer, error) {
+	resp := struct {
+		Data struct {
+			Transfers []Transfer `json:"transfers"`
+		} `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if limit != 0 {
+		params.Set("limit", strconv.FormatInt(limit, 10))
+	}
+	if page != 0 {
+		params.Set("page", strconv.FormatInt(page, 10))
+	}
+	if beginTimeInclusive != "" {
+		params.Set("beginTimeInclusive", beginTimeInclusive)
+	}
+	if endTimeExclusive != "" {
+		params.Set("endTimeExclusive", endTimeExclusive)
+	}
+	if transferType != "" {
+		params.Set("transferType", transferType)
+	}
+
+	path := common.EncodeURLValues(apexWithdraw, params)
 	headers := make(map[string]string)
 	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	headers["APEX-TIMESTAMP"] = timeStampStr
