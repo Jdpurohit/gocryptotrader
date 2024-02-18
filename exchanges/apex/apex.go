@@ -49,14 +49,15 @@ const (
 	apexCheckUserExists    = "/check-user-exist"
 
 	// Authenticated endpoints
-	apexNonce          = "/generate-nonce"
-	apexRegistration   = "/onboarding"
-	apexUser           = "/user"
-	apexModifyUser     = "/modify-user"
-	apexAccount        = "/account"
-	apexAccountBalance = "/account-balance"
-	apexDeposit        = "/transfers"
-	apexWithdraw       = "/withdraw-list"
+	apexNonce                 = "/generate-nonce"
+	apexRegistration          = "/onboarding"
+	apexUser                  = "/user"
+	apexModifyUser            = "/modify-user"
+	apexAccount               = "/account"
+	apexAccountBalance        = "/account-balance"
+	apexDeposit               = "/transfers"
+	apexWithdraw              = "/withdraw-list"
+	apexUncommonWithdrawalFee = "/uncommon-withdraw-fee"
 )
 
 // GetSystemTime gets system time
@@ -555,6 +556,44 @@ func (ap *Apex) GetWithdrawalList(ctx context.Context, limit, page int64, beginT
 	}
 
 	path := common.EncodeURLValues(apexWithdraw, params)
+	headers := make(map[string]string)
+	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	headers["APEX-TIMESTAMP"] = timeStampStr
+
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	signMsg := timeStampStr + http.MethodGet + apexAPIPath + apexAPIVersion + path
+	hmac, err := commonCrypto.GetHMAC(commonCrypto.HashSHA256,
+		[]byte(signMsg),
+		[]byte(commonCrypto.Base64Encode([]byte(creds.Secret))),
+	)
+	if err != nil {
+		return nil, err
+	}
+	headers["APEX-SIGNATURE"] = commonCrypto.Base64Encode(hmac)
+	return resp.Data.Transfers, ap.SendAuthHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, path, nil, headers, &resp, publicSpotRate, false)
+}
+
+// GetUncommonWithdrawalFee gets fast and cross-chain withdrawal fees
+func (ap *Apex) GetUncommonWithdrawalFee(ctx context.Context, amount, chainID string) ([]Transfer, error) {
+	resp := struct {
+		Data struct {
+			Transfers []Transfer `json:"transfers"`
+		} `json:"data"`
+		Error
+	}{}
+
+	params := url.Values{}
+	if amount != "" {
+		params.Set("amount", amount)
+	}
+	if chainID != "" {
+		params.Set("chainId", chainID)
+	}
+
+	path := common.EncodeURLValues(apexUncommonWithdrawalFee, params)
 	headers := make(map[string]string)
 	timeStampStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	headers["APEX-TIMESTAMP"] = timeStampStr

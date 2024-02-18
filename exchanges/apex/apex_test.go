@@ -218,3 +218,14 @@ func TestGetWithdrawalList(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetUncommonWithdrawalFee(t *testing.T) {
+	t.Parallel()
+	if !areTestAPIKeysSet() {
+		t.Skip("skipping test: api keys not set")
+	}
+	_, err := ap.GetUncommonWithdrawalFee(context.Background(), "1000", "5")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
